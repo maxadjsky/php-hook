@@ -16,27 +16,30 @@ use Dotenv\Dotenv;
 $env = new Dotenv(__DIR__);
 $env->load();
 $request = Request::createFromGlobals();
-$fs      = new Filesystem();
-$target  = getenv('TARGET');
-$user    = getenv('USER');
-$group   = getenv("GROUP");
-$json    = json_decode(file_get_contents('php://input'), true);
-if (empty($json['token']) || $json['token'] !== getenv('TOKEN')) {
+
+$fs     = new Filesystem();
+$target = getenv('TARGET');
+$user   = getenv('USER');
+$group  = getenv("GROUP");
+$json   = json_decode(strval($request->getContent(false)));
+if (empty($json->token) || $json->token !== getenv('TOKEN')) {
     return (new Response("token error"))->send();
 }
 if ($fs->exists($target)) {
     chdir(getenv('TARGET'));
     $pull = new Process('git pull');
     $pull->run();
-    $chown = new Process("chown -R {$user}:{$group} $target");
-    $chown->run();
-    $process = new Process('composer install');
-    $process->start();
 
+    $process = new Process('php /usr/local/bin/composer install');
+    $process->start();
+    $fs->chown($target, $user);
+    $fs->chgrp($target, $group);
     $response = new Response("Hello");
     $response->send();
     $process->wait();
 } else {
-    echo "Directory is not found or permission denied";
+    return response("Directory is not found or permission denied");
 }
+
+
 
